@@ -3,7 +3,8 @@ import { DEPTH, RULES } from '../config';
 import { BASE_STATS, type Stats } from '../data/upgrades';
 import { POTIONS, type PotionKind } from '../data/potions';
 import type { RunState } from '../core/RunState';
-import { HERO_ANIM } from '../art/sheets';
+import { animKey } from '../art/sheets';
+import type { CharacterId } from '../data/characters';
 
 /**
  * Герой.
@@ -14,6 +15,7 @@ import { HERO_ANIM } from '../art/sheets';
  * Пистолет и фонарь в руке — отдельные картинки, которые мы каждый кадр
  * ставим рядом с героем (syncAttachments).
  *
+ * Внешность берём из спрайтшита выбранного персонажа (run.character).
  * Анимации (idle / walk / hurt) создаются в art/sheets.ts, здесь только выбираем,
  * какую играть: this.play(key, true) — true значит «не перезапускать, если уже играет».
  */
@@ -32,15 +34,25 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Действующие зелья: вид → сколько секунд осталось. */
   readonly buffs = new Map<PotionKind, number>();
 
+  readonly character: CharacterId;
+  /** Имена анимаций этого персонажа: 'heroine-walk' и т. п. */
+  private readonly anim: Record<'idle' | 'walk' | 'hurt', string>;
+
   private readonly gun: Phaser.GameObjects.Image;
   private readonly lantern: Phaser.GameObjects.Image;
   private walkPhase = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, run: RunState) {
-    super(scene, x, y, 'hero');
+    super(scene, x, y, run.character);
     scene.add.existing(this); // показать на экране
     scene.physics.add.existing(this); // дать физическое тело
 
+    this.character = run.character;
+    this.anim = {
+      idle: animKey(run.character, 'idle'),
+      walk: animKey(run.character, 'walk'),
+      hurt: animKey(run.character, 'hurt'),
+    };
     this.stats = { ...run.stats };
     this.hp = run.hp;
     this.heroLevel = run.heroLevel;
@@ -58,9 +70,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.gun = scene.add.image(x, y, 'gun').setOrigin(0, 0.5).setDepth(DEPTH.player + 0.1);
     this.lantern = scene.add.image(x, y, 'lantern').setDepth(DEPTH.player + 0.1);
 
-    this.play(HERO_ANIM.idle);
+    this.play(this.anim.idle);
     // После вспышки от удара возвращаемся к обычной анимации.
-    this.on(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + HERO_ANIM.hurt, () => this.play(HERO_ANIM.idle));
+    this.on(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + this.anim.hurt, () => this.play(this.anim.idle));
   }
 
   /** dirX, dirY — направление от -1 до 1 (джойстик или клавиатура). */
@@ -77,8 +89,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const lookX = moving ? dirX : this.aimAngle !== null ? Math.cos(this.aimAngle) : 0;
     if (Math.abs(lookX) > 0.2) this.setFlipX(lookX < 0);
 
-    if (this.anims.getName() === HERO_ANIM.hurt && this.anims.isPlaying) return;
-    this.play(moving ? HERO_ANIM.walk : HERO_ANIM.idle, true);
+    if (this.anims.getName() === this.anim.hurt && this.anims.isPlaying) return;
+    this.play(moving ? this.anim.walk : this.anim.idle, true);
     // Сапоги скорости ускоряют и шаг, чтобы ноги не «скользили».
     this.anims.timeScale = moving ? this.moveSpeed / BASE_STATS.speed : 1;
   }
@@ -125,7 +137,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   /** Возвращает true, если герой погиб. */
   takeDamage(amount: number): boolean {
     this.hp = Math.max(0, this.hp - amount);
-    this.play(HERO_ANIM.hurt);
+    this.play(this.anim.hurt);
     return this.hp <= 0;
   }
 
@@ -154,7 +166,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
   /** Снимок героя для следующего уровня. */
   toRun(levelIndex: number): RunState {
-    return { levelIndex, stats: { ...this.stats }, hp: this.hp, heroLevel: this.heroLevel, xp: this.xp, pendingUpgrades: 0 };
+    return { character: this.character, levelIndex, stats: { ...this.stats }, hp: this.hp, heroLevel: this.heroLevel, xp: this.xp, pendingUpgrades: 0 };
   }
 
   destroy(fromScene?: boolean) {

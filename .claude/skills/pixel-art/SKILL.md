@@ -11,6 +11,7 @@ There is no image library installed (no PIL, no node-canvas). Art is drawn pixel
 | Script | Output | Notes |
 |---|---|---|
 | `tools/art/hero.mjs` | `hero.png` 6×3 frames of 32 | outline pass, foot shadow, idle/walk/hurt |
+| `tools/art/heroine.mjs` | `heroine.png` same layout as hero | hair + braid swing (`sway`), skirt |
 | `tools/art/rat.mjs` | `rat.png` 4×2 frames of 24 | head fixed for the eye overlay |
 | `tools/art/tiles.mjs` | `tiles.png` 7 tiles of 32 | seeded RNG, seamless floor, brick walls |
 | `tools/art/potions.mjs` | `potions.png` 3 frames of 16 | round flask, liquid colour per frame |

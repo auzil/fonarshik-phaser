@@ -48,9 +48,10 @@ src/
     enemies.ts            типы врагов
     upgrades.ts           характеристики героя, оружие, карточки усилений
     potions.ts            зелья: лечение, ярость, скорость
+    characters.ts         персонажи на выбор (Фонарщик, Фонарщица)
   art/
     textures.ts           графика, нарисованная кодом через Canvas
-    sheets.ts             картинки из public/assets/ (тайлы, герой, крыса) и анимации
+    sheets.ts             картинки из public/assets/ (тайлы, персонажи, крыса, зелья) и анимации
   world/
     LevelMap.ts           разбор карты, стены, данные для тайлмапа
     lineOfSight.ts        линия видимости (DDA) с толщиной луча
@@ -112,9 +113,13 @@ src/
 4 варианта пола, верх стены, стена с лицевой гранью снизу, глухая порода. Какой тайл где ставить, решает `LevelMap.toTileData()`.
 Как часто встречается каждый вариант пола — веса в `FLOOR_VARIANTS` (`src/world/LevelMap.ts`).
 
-**Своего героя.** Перерисуй `public/assets/hero.png` в любом пиксельном редакторе (Aseprite, Piskel, LibreSprite).
+**Своего героя.** Перерисуй `public/assets/hero.png` (или `heroine.png`) в любом пиксельном редакторе (Aseprite, Piskel, LibreSprite).
 Кадры 32×32, по 6 в строке; строки: idle (4 кадра), walk (6), hurt (2). Герой смотрит вправо.
 Число кадров и скорость анимаций — в `src/art/sheets.ts`.
+
+**Персонажа.** Нарисуй лист с той же раскладкой, что `hero.png`, положи в `public/assets/`,
+добавь строчку в `SHEETS` (`src/art/sheets.ts`, с `anims: CHARACTER_ANIMS`) и в `CHARACTERS` (`src/data/characters.ts`) —
+ключ листа и id персонажа совпадают. Карточка в меню появится сама. Выбор хранится в `localStorage` и в `RunState.character`.
 
 **Картинку врагу.** Так же устроена крыса (`public/assets/rat.png`, кадры 24×24: run — 4, bite — 3).
 Добавь запись `'enemy-<вид>'` в `SHEETS` (`src/art/sheets.ts`) с анимациями `run` и `bite` и координатой глаза `eye`.

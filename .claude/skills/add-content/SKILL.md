@@ -1,12 +1,21 @@
 ---
 name: add-content
-description: Recipes for adding game content to Фонарщик — a new enemy, weapon, potion, level-up upgrade, level map, or floor tile variant — touching exactly the right files. Use whenever the user asks to add or change one of these.
+description: Recipes for adding game content to Фонарщик — a new playable character, enemy, weapon, potion, level-up upgrade, level map, or floor tile variant — touching exactly the right files. Use whenever the user asks to add or change one of these.
 ---
 
 # Adding content
 
 Read the files named in the recipe before editing; match their comment style (Russian, explanatory).
 After any recipe: update README.md ("Как добавить…", file tree) and run the `verify-game` skill.
+
+## Playable character
+1. Art: a 32×32 sheet with the exact layout of `hero.png` (row 0 idle ×4, row 1 walk ×6, row 2 hurt ×2, facing right).
+   Placeholder: copy `tools/art/heroine.mjs` (`pixel-art` skill).
+2. `src/art/sheets.ts`: `<id>: { file: '<id>.png', frame: 32, columns: 6, anims: CHARACTER_ANIMS }`.
+3. `src/data/characters.ts`: add `<id>` to `CharacterId` and `CHARACTERS` (name, short desc). The id **is** the sheet key.
+The menu card, saving the choice and `Player` animations pick it up automatically. With 3+ characters check the menu row
+still fits a 320px-wide phone (`MenuScene.addCharacterPicker` splits the width evenly).
+Characters are cosmetic today; per-character stats would go as an optional `stats: Partial<Stats>` in `CharacterDef`, applied in `newRun()`.
 
 ## Enemy
 1. `src/data/enemies.ts`: add to `EnemyKind` and `ENEMIES` (hp, speed px/s, radius, damage, xp, potionChance, body/rim colours, eyes tint).

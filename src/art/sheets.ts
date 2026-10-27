@@ -29,18 +29,19 @@ export interface SheetDef {
   eye?: { x: number; y: number };
 }
 
+/**
+ * Общая раскладка листов персонажей (data/characters.ts), кадры 32×32:
+ * idle — дыхание, walk — шаг, hurt — вспышка и отдача.
+ */
+const CHARACTER_ANIMS: Record<string, AnimDef> = {
+  idle: { row: 0, frames: 4, frameRate: 4, repeat: -1 },
+  walk: { row: 1, frames: 6, frameRate: 12, repeat: -1 },
+  hurt: { row: 2, frames: 2, frameRate: 12, repeat: 0 },
+};
+
 export const SHEETS: Record<string, SheetDef> = {
-  /** 32×32. idle — дыхание, walk — шаг, hurt — вспышка и отдача. */
-  hero: {
-    file: 'hero.png',
-    frame: 32,
-    columns: 6,
-    anims: {
-      idle: { row: 0, frames: 4, frameRate: 4, repeat: -1 },
-      walk: { row: 1, frames: 6, frameRate: 12, repeat: -1 },
-      hurt: { row: 2, frames: 2, frameRate: 12, repeat: 0 },
-    },
-  },
+  hero: { file: 'hero.png', frame: 32, columns: 6, anims: CHARACTER_ANIMS },
+  heroine: { file: 'heroine.png', frame: 32, columns: 6, anims: CHARACTER_ANIMS },
   /** 24×24. run — галоп, bite — укус. Голова во всех кадрах на одном месте, иначе глаз «уплывёт». */
   'enemy-rat': {
     file: 'rat.png',
@@ -75,11 +76,6 @@ export const IMAGES: Record<string, string> = {
 /** Имя анимации: animKey('hero', 'walk') → 'hero-walk'. */
 export const animKey = (sheet: string, anim: string) => `${sheet}-${anim}`;
 
-export const HERO_ANIM = {
-  idle: animKey('hero', 'idle'),
-  walk: animKey('hero', 'walk'),
-  hurt: animKey('hero', 'hurt'),
-} as const;
 
 /** Вызывать в preload(). */
 export function loadAssets(scene: Phaser.Scene) {
