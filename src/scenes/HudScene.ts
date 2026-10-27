@@ -115,8 +115,10 @@ export class HudScene extends Phaser.Scene {
     setIfChanged(this.metaText, `ур. ${p.heroLevel}   убито ${this.world.kills}   ${this.world.levelDef.name}`);
     setIfChanged(this.weaponsText, WEAPON_IDS.filter(id => s[id] > 0).map(id => `${WEAPON_INFO[id].glyph} ${s[id]}`).join('   '));
 
-    // Действующие зелья с оставшимися секундами.
-    setIfChanged(this.buffsText, [...p.buffs].map(([kind, left]) => `${POTIONS[kind].glyph} ${POTIONS[kind].name} ${Math.ceil(left)}`).join('   '));
+    // Действующие зелья и путаница с оставшимися секундами.
+    const effects = [...p.buffs].map(([kind, left]) => `${POTIONS[kind].glyph} ${POTIONS[kind].name} ${Math.ceil(left)}`);
+    if (p.isConfused) effects.unshift(`⟲ Морок ${Math.ceil(p.confusedTime)}`);
+    setIfChanged(this.buffsText, effects.join('   '));
 
     const o = this.world.objectives;
     setIfChanged(this.shardsText, o.exitOpen ? '◆ выход открыт' : `◆ ${o.taken}/${o.total}`);

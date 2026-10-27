@@ -17,6 +17,8 @@ description: Check a change to Фонарщик end to end — typecheck, produc
    g.player.stats.blades = 5;     // weapon levels apply at the next level-up pick
    g.player.drink('speed');       // potions: 'heal' | 'frenzy' | 'speed'
    g.player.hp = 1;               // test low-HP / death
+   g.spawner.spawnOne(3, 10, 'wraith'); // force a specific enemy 3–10 steps away
+   g.player.confuse(3);           // reversed controls
    ```
    `debug: true` in `src/main.ts` draws physics bodies — use it to check circle offsets after changing sprite sizes.
 5. **Report honestly**: say what was verified (types, build, HTTP 200) and what was not (e.g. "not checked visually").

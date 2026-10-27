@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { Enemy } from '../entities/Enemy';
-import { enemyHpMultiplier, type EnemyKind } from '../data/enemies';
+import { ENEMIES, enemyHpMultiplier, type EnemyKind } from '../data/enemies';
 import type { LevelDef } from '../data/levels';
 import type { LevelMap } from '../world/LevelMap';
 import type { FlowField } from '../world/FlowField';
@@ -48,7 +48,8 @@ export class EnemySpawner {
     for (let i = 0; i < count; i++) this.spawnOne(5, 14);
   }
 
-  spawnOne(minSteps = 7, maxSteps = 20): Enemy | null {
+  /** kind — заставить появиться конкретного врага (удобно для отладки из консоли). */
+  spawnOne(minSteps = 7, maxSteps = 20, kind: EnemyKind = this.pickKind()): Enemy | null {
     const { scene, map, flow, level, enemies } = this.ctx;
     if (enemies.countActive() >= level.maxEnemies) return null;
     const hero = this.ctx.hero();
@@ -66,7 +67,7 @@ export class EnemySpawner {
         scene,
         p.x + Phaser.Math.Between(-6, 6),
         p.y + Phaser.Math.Between(-6, 6),
-        this.pickKind(),
+        kind,
         enemyHpMultiplier(this.ctx.levelIndex, this.elapsed),
       );
       enemies.add(enemy);
@@ -75,9 +76,9 @@ export class EnemySpawner {
     return null;
   }
 
-  /** Случайный тип врага с учётом весов из описания уровня. */
+  /** Случайный тип врага с учётом весов из описания уровня и лимита maxAlive. */
   private pickKind(): EnemyKind {
-    const mix = this.ctx.level.enemyMix;
+    const mix = this.ctx.level.enemyMix.filter(([kind]) => !this.atLimit(kind));
     const total = mix.reduce((sum, [, weight]) => sum + weight, 0);
     let roll = Math.random() * total;
     for (const [kind, weight] of mix) {
@@ -85,5 +86,13 @@ export class EnemySpawner {
       if (roll <= 0) return kind;
     }
     return mix[0][0];
+  }
+
+  /** Редких врагов (maxAlive) уже столько, сколько можно? */
+  private atLimit(kind: EnemyKind): boolean {
+    const max = ENEMIES[kind].maxAlive;
+    if (max === undefined) return false;
+    const alive = (this.ctx.enemies.getChildren() as Enemy[]).filter(e => e.kind === kind && !e.isDead).length;
+    return alive >= max;
   }
 }

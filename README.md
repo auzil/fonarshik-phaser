@@ -17,7 +17,8 @@ npm run preview    # посмотреть собранную версию
 
 Отладка из консоли браузера: `game.scene.getScene('Game')` вернёт текущую сцену со всеми полями.
 Например, `game.scene.getScene('Game').player.stats.blades = 5` даст серпы 5 уровня
-(создадутся при следующем выборе усиления), а `game.scene.getScene('Game').player.drink('frenzy')` — выпить зелье. Физику можно увидеть, поставив `debug: true` в `src/main.ts`.
+(создадутся при следующем выборе усиления), а `game.scene.getScene('Game').player.drink('frenzy')` — выпить зелье.
+Позвать конкретного врага: `game.scene.getScene('Game').spawner.spawnOne(3, 10, 'wraith')`. Физику можно увидеть, поставив `debug: true` в `src/main.ts`.
 
 ## Как читать код
 
@@ -51,7 +52,7 @@ src/
     characters.ts         персонажи на выбор (Фонарщик, Фонарщица)
   art/
     textures.ts           графика, нарисованная кодом через Canvas
-    sheets.ts             картинки из public/assets/ (тайлы, персонажи, крыса, зелья) и анимации
+    sheets.ts             картинки из public/assets/ (тайлы, персонажи, крыса, Морок, зелья) и анимации
   world/
     LevelMap.ts           разбор карты, стены, данные для тайлмапа
     lineOfSight.ts        линия видимости (DDA) с толщиной луча
@@ -59,7 +60,8 @@ src/
   entities/
     Player.ts  Enemy.ts  Bullet.ts
   systems/
-    EnemySpawner.ts       когда и где появляются враги
+    EnemySpawner.ts       когда и где появляются враги (с лимитом maxAlive для редких)
+    EnemyShots.ts         снаряды врагов: сгустки Морока путают управление
     Darkness.ts           слой тьмы с «вырезанным» светом (RenderTexture + ERASE)
     Effects.ts            частицы, тряска камеры, вибрация
     XpGems.ts             кристаллы опыта и магнит
@@ -120,6 +122,10 @@ src/
 **Персонажа.** Нарисуй лист с той же раскладкой, что `hero.png`, положи в `public/assets/`,
 добавь строчку в `SHEETS` (`src/art/sheets.ts`, с `anims: CHARACTER_ANIMS`) и в `CHARACTERS` (`src/data/characters.ts`) —
 ключ листа и id персонажа совпадают. Карточка в меню появится сама. Выбор хранится в `localStorage` и в `RunState.character`.
+
+**Стреляющего врага.** Дай врагу поле `ranged` (дальность, пауза, замах, скорость и урон снаряда, `confuse`) —
+как у Морока в `src/data/enemies.ts`. Остановку на дистанции и выстрел делает `GameScene.steerShooter()`,
+полёт снаряда — `systems/EnemyShots.ts`. Редкий враг: маленький вес в `enemyMix` и `maxAlive`.
 
 **Картинку врагу.** Так же устроена крыса (`public/assets/rat.png`, кадры 24×24: run — 4, bite — 3).
 Добавь запись `'enemy-<вид>'` в `SHEETS` (`src/art/sheets.ts`) с анимациями `run` и `bite` и координатой глаза `eye`.

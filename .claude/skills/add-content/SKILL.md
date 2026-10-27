@@ -22,6 +22,10 @@ Characters are cosmetic today; per-character stats would go as an optional `stat
 2. Add it to `enemyMix` of the levels where it should appear (`src/data/levels.ts`).
 3. Looks: by default a circle is drawn from body/rim in `art/textures.ts` (`createEnemy`). Special touches go there.
    For real art + animation use the `add-sprite` skill (sheet key `enemy-<kind>`, anims `run` + `bite`, `eye`).
+4. Rare enemy: tiny `enemyMix` weight + `maxAlive` in its def (the spawner skips kinds at their limit).
+5. Shooter: a `ranged: RangedAttack` field (range, cooldown, windup, shotSpeed, damage, confuse). `GameScene.steerShooter()`
+   stops it at ~75% of range with line of sight and fires through `systems/EnemyShots.ts`; its sheet needs a `cast` anim
+   (played for the windup). New on-hit effects go in `GameScene.onShotHit()`; timed debuffs live on `Player` like `confusedTime`.
 
 ## Weapon
 1. `src/data/upgrades.ts`: level field in `Stats` + `BASE_STATS` (0 = not owned), `WeaponId`, `WEAPON_INFO` (glyph, name, descs).

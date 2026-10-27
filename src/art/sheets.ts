@@ -53,6 +53,22 @@ export const SHEETS: Record<string, SheetDef> = {
     },
     eye: { x: 5.5, y: 0.5 },
   },
+  /**
+   * 28×28. Морок: run — парит (шевелится только подол), cast — сгусток в руке и бросок.
+   * bite — та же строка, что cast (вплотную он тоже бьёт рукой).
+   * frameRate cast подобран под windup 0,45 с: 3 кадра ≈ замах.
+   */
+  'enemy-wraith': {
+    file: 'wraith.png',
+    frame: 28,
+    columns: 4,
+    anims: {
+      run: { row: 0, frames: 4, frameRate: 6, repeat: -1 },
+      cast: { row: 1, frames: 3, frameRate: 7, repeat: 0 },
+      bite: { row: 1, frames: 3, frameRate: 14, repeat: 0 },
+    },
+    eye: { x: 3.5, y: -4.5 },
+  },
   /** 16×16, кадры по порядку: лечение, ярость, скорость (см. frame в data/potions.ts). Анимаций нет. */
   potions: {
     file: 'potions.png',

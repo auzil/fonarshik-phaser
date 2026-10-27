@@ -13,6 +13,7 @@ There is no image library installed (no PIL, no node-canvas). Art is drawn pixel
 | `tools/art/hero.mjs` | `hero.png` 6×3 frames of 32 | outline pass, foot shadow, idle/walk/hurt |
 | `tools/art/heroine.mjs` | `heroine.png` same layout as hero | hair + braid swing (`sway`), skirt |
 | `tools/art/rat.mjs` | `rat.png` 4×2 frames of 24 | head fixed for the eye overlay |
+| `tools/art/wraith.mjs` | `wraith.png` 4×2 frames of 28 | floating robe, hem waves, cast orb; head fixed |
 | `tools/art/tiles.mjs` | `tiles.png` 7 tiles of 32 | seeded RNG, seamless floor, brick walls |
 | `tools/art/potions.mjs` | `potions.png` 3 frames of 16 | round flask, liquid colour per frame |
 

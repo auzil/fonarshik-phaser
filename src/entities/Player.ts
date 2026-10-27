@@ -33,6 +33,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   aimAngle: number | null = null;
   /** Действующие зелья: вид → сколько секунд осталось. */
   readonly buffs = new Map<PotionKind, number>();
+  /** Сколько секунд ещё перепутано управление (попадание Морока). */
+  confusedTime = 0;
 
   readonly character: CharacterId;
   /** Имена анимаций этого персонажа: 'heroine-walk' и т. п. */
@@ -124,6 +126,21 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       if (left <= dt) this.buffs.delete(kind);
       else this.buffs.set(kind, left - dt);
     }
+    this.confusedTime = Math.max(0, this.confusedTime - dt);
+    // Пока управление спутано, герой подкрашен фиолетовым.
+    if (this.isConfused) this.setTint(0xc9a2ff);
+    else this.clearTint();
+  }
+
+  get isConfused() {
+    return this.confusedTime > 0;
+  }
+
+  /** Перепутать управление на seconds. Повторное попадание продлевает, а не складывает. Возвращает true, если путаница только началась. */
+  confuse(seconds: number): boolean {
+    const wasConfused = this.isConfused;
+    this.confusedTime = Math.max(this.confusedTime, seconds);
+    return !wasConfused;
   }
 
   regenerate(dt: number) {

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ENEMIES, type EnemyKind } from '../data/enemies';
 
 /**
- * Почти вся графика игры рисуется кодом при запуске. Тайлы, герой и крыса — из файлов, см. art/sheets.ts.
+ * Почти вся графика игры рисуется кодом при запуске. Тайлы, персонажи, крыса, Морок и зелья — из файлов, см. art/sheets.ts.
  *
  * Как это работает: создаём CanvasTexture (обычный <canvas> внутри Phaser),
  * рисуем на нём через привычный Canvas 2D API и вызываем refresh().
@@ -42,6 +42,16 @@ export function createTextures(scene: Phaser.Scene) {
     ctx.fillRect(0, 0, 12, 4);
     ctx.fillStyle = '#fff1d0';
     ctx.fillRect(9, 1, 3, 2);
+  });
+
+  // Сгусток Морока: фиолетовое свечение с белым ядром.
+  makeTexture(scene, 'hex-bolt', 12, 12, ctx => {
+    const g = ctx.createRadialGradient(6, 6, 0, 6, 6, 6);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.35, '#c9a2ff');
+    g.addColorStop(1, 'rgba(120,60,200,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 12, 12);
   });
 
   makeTexture(scene, 'gem', 8, 12, ctx => {

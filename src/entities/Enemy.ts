@@ -10,6 +10,9 @@ import { SHEETS, animKey, type SheetDef } from '../art/sheets';
  * Внешний вид бывает двух видов:
  *   - круг, нарисованный кодом (art/textures.ts), который смотрит глазами на героя;
  *   - спрайтшит с анимациями run/bite (art/sheets.ts), который разворачивается flipX.
+ *
+ * Стрелки (def.ranged) ещё и замахиваются и стреляют: см. updateRanged().
+ * Сам снаряд создаёт GameScene через систему EnemyShots.
  */
 export class Enemy extends Phaser.Physics.Arcade.Sprite {
   readonly kind: EnemyKind;
@@ -24,6 +27,10 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   private burnTime = 0;
   private readonly speedJitter = Phaser.Math.FloatBetween(0.9, 1.1);
   private facing = 0;
+
+  /** Стрелок: время до следующего выстрела и сколько осталось замаха. */
+  private shotCooldown = 0;
+  private windupLeft = 0;
 
   /** Таймеры, которые используют разные системы. */
   biteCooldown = 0;
@@ -56,7 +63,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.play(animKey(texture, 'run'));
       // У каждой крысы свой ритм, иначе вся стая бежит в ногу.
       this.anims.setProgress(Math.random());
-      this.on(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + animKey(texture, 'bite'), () => this.play(animKey(texture, 'run')));
+      // Любая разовая анимация (укус, замах) закончилась — снова бежим.
+      this.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => this.play(animKey(texture, 'run')));
     } else {
       this.eyes = scene.add
         .image(x, y, 'eyes')
@@ -64,6 +72,9 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
         .setScale(this.def.radius / 11)
         .setDepth(DEPTH.glow);
     }
+
+    // Первый выстрел не сразу после появления.
+    if (this.def.ranged) this.shotCooldown = Phaser.Math.FloatBetween(1, this.def.ranged.cooldown);
   }
 
   get radius() {
@@ -81,7 +92,16 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   walkTowards(targetX: number, targetY: number, lookX: number, lookY: number, dt: number) {
     const angle = Math.atan2(targetY - this.y, targetX - this.x);
     const speed = this.def.speed * this.speedJitter;
-    this.setVelocity(Math.cos(angle) * speed + this.knockX, Math.sin(angle) * speed + this.knockY);
+    this.moveAndLook(Math.cos(angle) * speed, Math.sin(angle) * speed, lookX, lookY, dt);
+  }
+
+  /** Стоять на месте и смотреть на (lookX, lookY) — так стреляет Морок. Отбрасывание всё равно работает. */
+  holdPosition(lookX: number, lookY: number, dt: number) {
+    this.moveAndLook(0, 0, lookX, lookY, dt);
+  }
+
+  private moveAndLook(vx: number, vy: number, lookX: number, lookY: number, dt: number) {
+    this.setVelocity(vx + this.knockX, vy + this.knockY);
 
     // Затухание отбрасывания, не зависящее от FPS: за 1/60 секунды остаётся 85%.
     const decay = Math.pow(0.85, dt * 60);
@@ -94,6 +114,45 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
     if (this.sheet && Math.abs(lookDir) > 0.2) this.setFlipX(lookDir < 0);
     this.biteCooldown -= dt;
     this.updateTint(dt);
+  }
+
+  /** Идёт замах перед выстрелом. */
+  get isCasting() {
+    return this.windupLeft > 0;
+  }
+
+  /**
+   * Таймер стрелка. canShoot — герой в радиусе и его видно.
+   * Возвращает true в тот кадр, когда снаряд пора выпустить.
+   */
+  updateRanged(dt: number, canShoot: boolean): boolean {
+    const attack = this.def.ranged;
+    if (!attack) return false;
+
+    if (this.windupLeft > 0) {
+      if (!canShoot) {
+        // Герой спрятался за угол — замах сорвался, скоро попробуем снова.
+        this.windupLeft = 0;
+        this.shotCooldown = 0.5;
+        return false;
+      }
+      this.windupLeft -= dt;
+      if (this.windupLeft > 0) return false;
+      this.shotCooldown = attack.cooldown;
+      return true;
+    }
+
+    this.shotCooldown -= dt;
+    if (canShoot && this.shotCooldown <= 0) {
+      this.windupLeft = attack.windup;
+      if (this.sheet) this.play(animKey(this.texture.key, 'cast'));
+    }
+    return false;
+  }
+
+  /** Откуда вылетает снаряд: из руки, она впереди по направлению взгляда. */
+  get handPosition() {
+    return { x: this.x + (this.flipX ? -11 : 11), y: this.y - 2 };
   }
 
   /** Анимация укуса (сам урон считает GameScene). */
@@ -141,7 +200,8 @@ export class Enemy extends Phaser.Physics.Arcade.Sprite {
   syncEyes() {
     if (this.sheet?.eye) {
       const { x, y } = this.sheet.eye;
-      this.eyes.setPosition(this.x + (this.flipX ? -x : x), this.y + y);
+      // Во время замаха глаз разгорается.
+      this.eyes.setPosition(this.x + (this.flipX ? -x : x), this.y + y).setScale(this.isCasting ? 1.8 : 1);
       return;
     }
     const r = this.def.radius * 0.45;

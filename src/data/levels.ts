@@ -32,7 +32,7 @@ export const LEVELS: LevelDef[] = [
     spawnEvery: 1.5,
     maxEnemies: 22,
     shardAmbush: 5,
-    enemyMix: [['ghoul', 1], ['rat', 0.35]],
+    enemyMix: [['ghoul', 1], ['rat', 0.35], ['wraith', 0.04]],
     map: `
 ################################
 #P.....#..........#.....K......#
@@ -58,7 +58,7 @@ export const LEVELS: LevelDef[] = [
     spawnEvery: 1.0,
     maxEnemies: 38,
     shardAmbush: 8,
-    enemyMix: [['ghoul', 1], ['rat', 0.7], ['golem', 0.15]],
+    enemyMix: [['ghoul', 1], ['rat', 0.7], ['golem', 0.15], ['wraith', 0.08]],
     map: `
 ############################################
 #P....#.............#.......#..............#
@@ -88,7 +88,7 @@ export const LEVELS: LevelDef[] = [
     spawnEvery: 0.7,
     maxEnemies: 58,
     shardAmbush: 11,
-    enemyMix: [['ghoul', 1], ['rat', 0.9], ['golem', 0.35]],
+    enemyMix: [['ghoul', 1], ['rat', 0.9], ['golem', 0.35], ['wraith', 0.12]],
     map: `
 ##################################################
 #P.......#.................#.....................#

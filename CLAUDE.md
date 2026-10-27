@@ -40,7 +40,7 @@ The project is **not a git repository** — there is no history to diff against 
 - Everything else is drawn in code in `src/art/textures.ts`. `makeTexture` **skips keys that already exist**, so loading a PNG under
   the same key (e.g. `enemy-ghoul`) replaces the code-drawn version automatically. Remove the dead canvas code when you do.
 - Current file assets: `hero.png` + `heroine.png` (32px, idle/walk/hurt — shared `CHARACTER_ANIMS`; sheet key = `CharacterId`), `rat.png` (24px, run/bite, texture key `enemy-rat`),
-  `tiles.png` (7×32px strip, order = `TILE_INDEX` in `world/LevelMap.ts`), `potions.png` (3×16px, frame = `POTIONS[k].frame`).
+  `wraith.png` (28px, run/cast/bite, key `enemy-wraith`), `tiles.png` (7×32px strip, order = `TILE_INDEX` in `world/LevelMap.ts`), `potions.png` (3×16px, frame = `POTIONS[k].frame`).
 - Characters are drawn **facing right**; code mirrors with `flipX` (with a 0.2 threshold to avoid jitter).
 - Physics circle offset is computed from the frame: `this.width / 2 - radius` — don't hard-code it.
 - Sheet-based enemies use a single glowing `eye` overlay at `SHEETS[key].eye` (offset from center, facing right). The head must stay
@@ -61,7 +61,7 @@ The project is **not a git repository** — there is no history to diff against 
 ## Debugging
 
 In the browser console: `game.scene.getScene('Game')` is the live scene, e.g. `.player.stats.blades = 5`,
-`.player.drink('frenzy')`. `debug: true` in `src/main.ts` shows physics bodies.
+`.player.drink('frenzy')`, `.player.confuse(3)`, `.spawner.spawnOne(3, 10, 'wraith')` (force-spawn a kind). `debug: true` in `src/main.ts` shows physics bodies.
 
 ## Project-local helpers
 

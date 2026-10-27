@@ -16,6 +16,8 @@ import { Effects } from '../systems/Effects';
 import { EnemySpawner } from '../systems/EnemySpawner';
 import { XpGems } from '../systems/XpGems';
 import { Potions } from '../systems/Potions';
+import { EnemyShots } from '../systems/EnemyShots';
+import type { RangedAttack } from '../data/enemies';
 import { POTIONS, rollPotion, type PotionKind } from '../data/potions';
 import { Objectives } from '../systems/Objectives';
 import { Pistol, WEAPON_FACTORY, type Weapon, type WeaponHost } from '../weapons';
@@ -35,7 +37,7 @@ export const GAME_EVENT = {
  * Сама сцена почти ничего не «умеет» — она собирает системы и связывает их:
  *   LevelMap + FlowField  — где стены и как ходить
  *   Player, Enemy, Bullet — сущности с физическими телами
- *   EnemySpawner, XpGems, Potions, Objectives, Darkness, Effects — системы
+ *   EnemySpawner, EnemyShots, XpGems, Potions, Objectives, Darkness, Effects — системы
  *   Weapon[]              — всё оружие героя
  *
  * Порядок кадра:
@@ -62,6 +64,7 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
   private spawner!: EnemySpawner;
   private gems!: XpGems;
   private potions!: Potions;
+  private enemyShots!: EnemyShots;
   private weapons: Weapon[] = [];
   private ownedWeapons = new Set<WeaponId>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
@@ -101,6 +104,7 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.objectives = new Objectives(this, this.map);
     this.gems = new XpGems(this);
     this.potions = new Potions(this);
+    this.enemyShots = new EnemyShots(this, this.fx);
 
     this.player = new Player(this, this.map.start.x, this.map.start.y, this.run);
     // Обычные (не физические) группы: просто списки объектов, которые удобно передать в коллайдер.
@@ -217,6 +221,11 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.elapsed += dt;
 
     const dir = this.readInput();
+    // Попал Морок — управление наоборот.
+    if (this.player.isConfused) {
+      dir.x = -dir.x;
+      dir.y = -dir.y;
+    }
     this.player.move(dir.x, dir.y, dt);
     this.player.regenerate(dt);
     this.player.updateBuffs(dt);
@@ -227,6 +236,8 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
 
     for (const weapon of this.weapons) weapon.update(dt);
     this.tickBullets(dt);
+    for (const attack of this.enemyShots.update(dt, this.player, this.map, this.darkness)) this.onShotHit(attack);
+    if (this.finished) return; // снаряд мог добить героя
     this.removeDeadEnemies();
 
     const xp = this.gems.update(dt, this.player, this.darkness);
@@ -267,10 +278,16 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     return len > 1 ? { x: x / len, y: y / len } : { x, y };
   }
 
-  /** ИИ врагов: рядом и в прямой видимости — идём прямо на героя, иначе по полю потока. */
+  /**
+   * ИИ врагов: рядом и в прямой видимости — идём прямо на героя, иначе по полю потока.
+   * Стрелки (def.ranged), которые видят героя, останавливаются на дистанции и стреляют.
+   */
   private steerEnemies(dt: number) {
     const p = this.player;
     for (const enemy of this.livingEnemies()) {
+      const attack = enemy.def.ranged;
+      if (attack && this.steerShooter(enemy, attack, dt)) continue;
+
       let targetX = p.x;
       let targetY = p.y;
       const near = Phaser.Math.Distance.Between(enemy.x, enemy.y, p.x, p.y) < TILE * 2.5;
@@ -315,6 +332,27 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     }
   }
 
+  /** Возвращает true, если стрелок в этот кадр стоит и целится (тогда обычное движение не нужно). */
+  private steerShooter(enemy: Enemy, attack: RangedAttack, dt: number): boolean {
+    const p = this.player;
+    const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, p.x, p.y);
+    // Толщина 4 — как у сгустка, чтобы не стрелять в угол стены.
+    const canShoot = dist < attack.range && hasLineOfSight(this.map, enemy.x, enemy.y, p.x, p.y, 4);
+
+    if (enemy.updateRanged(dt, canShoot)) {
+      const hand = enemy.handPosition;
+      this.enemyShots.fire(hand.x, hand.y, Math.atan2(p.y - hand.y, p.x - hand.x), attack);
+    }
+    if (enemy.isCasting) this.darkness.addLight(enemy.x, enemy.y, 30, 0.45); // замах видно в темноте
+
+    // Видит героя и уже достаточно близко — стоит. Иначе подходит, как все.
+    if (enemy.isCasting || (canShoot && dist < attack.range * 0.75)) {
+      enemy.holdPosition(p.x, p.y, dt);
+      return true;
+    }
+    return false;
+  }
+
   /* ───────────────────────── столкновения ───────────────────────── */
 
   private onEnemyTouch(enemy: Enemy) {
@@ -322,7 +360,17 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     enemy.biteCooldown = RULES.contactCooldown;
     enemy.bite();
 
-    const died = this.player.takeDamage(enemy.def.damage);
+    this.damagePlayer(enemy.def.damage);
+  }
+
+  private onShotHit(attack: RangedAttack) {
+    if (this.finished) return;
+    if (attack.confuse > 0 && this.player.confuse(attack.confuse)) this.toast('Управление спуталось!');
+    this.damagePlayer(attack.damage);
+  }
+
+  private damagePlayer(amount: number) {
+    const died = this.player.takeDamage(amount);
     this.fx.shake(0.005, 120);
     this.fx.vibrate();
     this.events.emit(GAME_EVENT.hurt);
@@ -364,11 +412,13 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.fx.burst(this.player.x, this.player.y, def.color, 14);
   }
 
-  /** Искры от героя, пока действуют зелья. */
+  /** Искры от героя, пока действуют зелья (и фиолетовые — пока спутано управление). */
   private potionSparks() {
     const p = this.player;
-    for (const kind of p.buffs.keys()) {
-      if (Math.random() < 0.25) this.fx.burst(p.x + Phaser.Math.Between(-6, 6), p.y + Phaser.Math.Between(-4, 8), POTIONS[kind].color, 1);
+    const colors = [...p.buffs.keys()].map(kind => POTIONS[kind].color);
+    if (p.isConfused) colors.push(0xc9a2ff);
+    for (const color of colors) {
+      if (Math.random() < 0.25) this.fx.burst(p.x + Phaser.Math.Between(-6, 6), p.y + Phaser.Math.Between(-4, 8), color, 1);
     }
   }
 
