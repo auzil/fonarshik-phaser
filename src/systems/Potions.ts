@@ -14,6 +14,8 @@ const BLINK_TIME = 4;
 interface Potion {
   sprite: Phaser.GameObjects.Image;
   kind: PotionKind;
+  /** Сколько секунд лежит (Infinity — пока не подберут). */
+  lifetime: number;
   baseY: number;
   age: number;
 }
@@ -27,9 +29,10 @@ export class Potions {
 
   constructor(private readonly scene: Phaser.Scene) {}
 
-  drop(x: number, y: number, kind: PotionKind) {
+  /** lifetime — сколько секунд зелье лежит; для предметов, расставленных на карте, — Infinity. */
+  drop(x: number, y: number, kind: PotionKind, lifetime = LIFETIME) {
     const sprite = this.scene.add.image(x, y, 'potions', POTIONS[kind].frame).setDepth(DEPTH.loot);
-    this.potions.push({ sprite, kind, baseY: y, age: 0 });
+    this.potions.push({ sprite, kind, lifetime, baseY: y, age: 0 });
   }
 
   /** Возвращает зелья, подобранные за этот кадр. */
@@ -44,11 +47,11 @@ export class Potions {
       if (Phaser.Math.Distance.Between(s.x, p.baseY, player.x, player.y) < PICKUP_DISTANCE) {
         picked.push(p.kind);
         s.destroy();
-      } else if (p.age > LIFETIME) {
+      } else if (p.age > p.lifetime) {
         s.destroy();
       } else {
         // Перед исчезновением мигает, и чем ближе конец, тем чаще.
-        const left = LIFETIME - p.age;
+        const left = p.lifetime - p.age;
         s.setVisible(left > BLINK_TIME || Math.sin(p.age * (left < 1.5 ? 30 : 15)) > 0);
         darkness.addLight(s.x, s.y, 18, 0.45);
       }

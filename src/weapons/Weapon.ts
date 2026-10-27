@@ -34,7 +34,26 @@ export interface Weapon {
 }
 
 /**
- * Ближайший живой враг в радиусе range, до которого есть линия видимости.
+ * Какая часть радиуса фонаря считается «светло». У края пятно света почти прозрачное,
+ * и враг там едва различим — по такому герой не стреляет.
+ */
+const LIT_FRACTION = 0.85;
+
+/**
+ * Видит ли герой врага: враг в свете фонаря и между ними нет стены.
+ * Стена — это и есть тень (см. world/shadows.ts), так что проверка совпадает с тем, что на экране.
+ * Враги в темноте (видны только светящиеся глаза) не годятся в цели.
+ */
+export function isLit(host: WeaponHost, enemy: Enemy): boolean {
+  const { player, map } = host;
+  const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y) - enemy.radius;
+  if (dist > player.lightRadius * LIT_FRACTION) return false;
+  return hasLineOfSight(map, player.x, player.y, enemy.x, enemy.y);
+}
+
+/**
+ * Ближайший живой враг в радиусе range, которого видит герой (isLit) и до которого
+ * есть линия видимости из точки (fromX, fromY).
  * thickness — толщина луча (для пуль), exclude — кого пропустить (для цепной молнии).
  */
 export function findNearestVisible(
@@ -52,6 +71,7 @@ export function findNearestVisible(
     // Меряем до края врага, а не до центра: большого голема видно чуть раньше.
     const dist = Math.hypot(enemy.x - fromX, enemy.y - fromY) - enemy.radius;
     if (dist >= bestDist) continue;
+    if (!isLit(host, enemy)) continue; // в темноте не стреляем
     if (!hasLineOfSight(host.map, fromX, fromY, enemy.x, enemy.y, opts.thickness ?? 0)) continue;
     best = enemy;
     bestDist = dist;

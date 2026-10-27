@@ -5,6 +5,7 @@ import { POTIONS, type PotionKind } from '../data/potions';
 import type { RunState } from '../core/RunState';
 import { animKey } from '../art/sheets';
 import type { CharacterId } from '../data/characters';
+import type { LevelMap } from '../world/LevelMap';
 
 /**
  * Герой.
@@ -33,6 +34,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   aimAngle: number | null = null;
   /** Действующие зелья: вид → сколько секунд осталось. */
   readonly buffs = new Map<PotionKind, number>();
+  /** Масло в фонаре, от 0 до RULES.maxFuel. От него зависит радиус света (lightRadius). */
+  fuel: number = RULES.maxFuel;
   /** Сколько секунд ещё перепутано управление (попадание Морока). */
   confusedTime = 0;
 
@@ -43,6 +46,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private readonly gun: Phaser.GameObjects.Image;
   private readonly lantern: Phaser.GameObjects.Image;
   private walkPhase = 0;
+  /** Последняя точка, где центр героя был не в стене (страховка, см. keepOutOfWalls). */
+  private lastFree: { x: number; y: number };
 
   constructor(scene: Phaser.Scene, x: number, y: number, run: RunState) {
     super(scene, x, y, run.character);
@@ -67,7 +72,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     const offset = this.width / 2 - Player.RADIUS;
     body.setCircle(Player.RADIUS, offset, offset);
     // Враги не могут толкать героя, а он их — может.
+    // Одного pushable = false мало: у круглых тел Phaser всё равно сдвигает тело на половину пересечения,
+    // и толпа вдавливает героя в стену. immovable запрещает это совсем, а стены (тайлы) героя по-прежнему держат.
     body.pushable = false;
+    body.immovable = true;
+    this.lastFree = { x, y };
 
     this.gun = scene.add.image(x, y, 'gun').setOrigin(0, 0.5).setDepth(DEPTH.player + 0.1);
     this.lantern = scene.add.image(x, y, 'lantern').setDepth(DEPTH.player + 0.1);
@@ -114,9 +123,32 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     return k;
   }
 
+  /** Доля масла в баке, 0..1. */
+  get fuelRatio() {
+    return this.fuel / RULES.maxFuel;
+  }
+
+  /**
+   * Радиус света с учётом масла: до fuelFullLightAt светит в полную силу,
+   * ниже плавно сжимается до minLightFactor от stats.light.
+   */
+  get lightRadius() {
+    const t = Math.min(1, this.fuelRatio / RULES.fuelFullLightAt);
+    return this.stats.light * (RULES.minLightFactor + (1 - RULES.minLightFactor) * t);
+  }
+
+  burnFuel(dt: number) {
+    this.fuel = Math.max(0, this.fuel - this.stats.fuelBurn * dt);
+  }
+
+  refuel(amount: number) {
+    this.fuel = Math.min(RULES.maxFuel, this.fuel + amount);
+  }
+
   drink(kind: PotionKind) {
     const def = POTIONS[kind];
     if (def.heal) this.heal(def.heal);
+    if (def.fuel) this.refuel(def.fuel);
     // Повторное зелье того же вида не складывается, а продлевает время.
     if (def.duration) this.buffs.set(kind, def.duration);
   }
@@ -168,6 +200,20 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
       gained++;
     }
     return gained;
+  }
+
+  /**
+   * Страховка: если центр героя всё-таки оказался в стене, возвращаем его в последнюю свободную точку.
+   * В стене фонарь не светит (все грани клетки отбрасывают тень), и экран становится чёрным.
+   * Вызывается после шага физики.
+   */
+  keepOutOfWalls(map: LevelMap) {
+    if (map.isWallAt(this.x, this.y)) {
+      (this.body as Phaser.Physics.Arcade.Body).reset(this.lastFree.x, this.lastFree.y);
+    } else {
+      this.lastFree.x = this.x;
+      this.lastFree.y = this.y;
+    }
   }
 
   /**

@@ -77,11 +77,11 @@ export class HudScene extends Phaser.Scene {
 
     this.hurtOverlay.setSize(w, h);
     this.hpText.setPosition(left + 6, top + 2);
-    this.metaText.setPosition(left, top + 28);
-    this.weaponsText.setPosition(left, top + 46);
-    this.buffsText.setPosition(left, top + 64);
+    this.metaText.setPosition(left, top + 36);
+    this.weaponsText.setPosition(left, top + 54);
+    this.buffsText.setPosition(left, top + 72);
     this.shardsText.setPosition(w - 16, top + 2);
-    this.toastText.setPosition(w / 2, top + 84);
+    this.toastText.setPosition(w / 2, top + 92);
 
     this.pauseButton?.destroy();
     this.pauseButton = makeButton(this, w - 16 - 76, top + 24, {
@@ -109,6 +109,11 @@ export class HudScene extends Phaser.Scene {
     g.lineStyle(1, COLOR.bone, 0.18).strokeRect(left, top, BAR_W, 14);
     g.fillStyle(0x000000, 0.55).fillRect(left, top + 18, BAR_W, 6);
     g.fillStyle(COLOR.soul, 1).fillRect(left, top + 18, BAR_W * (p.xp / RULES.xpToNext(p.heroLevel)), 6);
+    // Масло в фонаре. Когда его мало, полоска мигает.
+    const lowFuel = p.fuelRatio <= RULES.lowFuelWarning;
+    const fuelAlpha = lowFuel ? 0.45 + 0.55 * Math.abs(Math.sin(this.time.now * 0.008)) : 1;
+    g.fillStyle(0x000000, 0.55).fillRect(left, top + 28, BAR_W, 4);
+    g.fillStyle(COLOR.ember, fuelAlpha).fillRect(left, top + 28, BAR_W * p.fuelRatio, 4);
 
     // setText перерисовывает текстуру текста даже при том же значении, поэтому сравниваем сами.
     setIfChanged(this.hpText, `${Math.ceil(p.hp)} / ${s.maxHp}`);

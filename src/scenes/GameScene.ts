@@ -69,9 +69,10 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
   private ownedWeapons = new Set<WeaponId>();
   private keys!: Record<'up' | 'down' | 'left' | 'right' | 'w' | 'a' | 's' | 'd', Phaser.Input.Keyboard.Key>;
   private hpBars!: Phaser.GameObjects.Graphics;
-  private lanternGlow!: Phaser.GameObjects.Image;
   private pendingUpgrades = 0;
   private finished = false;
+  /** Уже предупредили, что масло кончается (сбрасывается, когда долили). */
+  private warnedLowFuel = false;
 
   constructor() {
     super(SCENE.game);
@@ -90,6 +91,7 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.ownedWeapons = new Set();
     this.pendingUpgrades = data.run.pendingUpgrades;
     this.finished = false;
+    this.warnedLowFuel = false;
   }
 
   create() {
@@ -100,11 +102,13 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     const walls = this.createTilemap();
 
     this.fx = new Effects(this);
-    this.darkness = new Darkness(this);
+    this.darkness = new Darkness(this, this.map);
     this.objectives = new Objectives(this, this.map);
     this.gems = new XpGems(this);
     this.potions = new Potions(this);
     this.enemyShots = new EnemyShots(this, this.fx);
+    // Банки масла, расставленные на карте, лежат, пока их не подберут.
+    for (const spot of this.map.oilSpots) this.potions.drop(spot.x, spot.y, 'oil', Infinity);
 
     this.player = new Player(this, this.map.start.x, this.map.start.y, this.run);
     // Обычные (не физические) группы: просто списки объектов, которые удобно передать в коллайдер.
@@ -118,7 +122,8 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
       level: this.levelDef,
       levelIndex: this.run.levelIndex,
       enemies: this.enemies,
-      hero: () => ({ x: this.player.x, y: this.player.y, light: this.player.stats.light }),
+      // Свет тускнеет без масла — и враги появляются ближе.
+      hero: () => ({ x: this.player.x, y: this.player.y, light: this.player.lightRadius }),
     });
 
     this.setupCollisions(walls);
@@ -129,8 +134,6 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.syncWeapons();
 
     this.hpBars = this.add.graphics().setDepth(DEPTH.hpBars);
-    // Тёплый отсвет фонаря: то же пятно света, но оранжевое и в режиме ADD поверх тьмы.
-    this.lanternGlow = this.add.image(0, 0, 'light').setTint(0xffaa50).setAlpha(0.14).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.darkness + 0.5);
 
     this.flow.update(this.player.x, this.player.y);
 
@@ -173,11 +176,12 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     const physics = this.physics.add;
 
     // collider — тела расталкиваются; overlap — только сообщает о пересечении.
+    // Порядок важен: Phaser проверяет коллайдеры по очереди. Сначала тела расталкивают друг друга,
+    // а стены — последними, чтобы после всех толчков никто не остался внутри стены.
+    physics.collider(this.enemies, this.enemies); // враги не слипаются в одну точку
+    physics.collider(this.player, this.enemies, (_player, enemy) => this.onEnemyTouch(enemy as Enemy));
     physics.collider(this.player, walls);
     physics.collider(this.enemies, walls);
-    physics.collider(this.enemies, this.enemies); // враги не слипаются в одну точку
-
-    physics.collider(this.player, this.enemies, (_player, enemy) => this.onEnemyTouch(enemy as Enemy));
 
     physics.collider(this.bullets, walls, bullet => {
       const b = bullet as Bullet;
@@ -229,6 +233,8 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     this.player.move(dir.x, dir.y, dt);
     this.player.regenerate(dt);
     this.player.updateBuffs(dt);
+    this.player.burnFuel(dt);
+    this.checkFuel();
 
     this.flow.update(this.player.x, this.player.y);
     this.spawner.update(dt);
@@ -251,18 +257,20 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
   /** Вызывается после шага физики (событие POST_UPDATE). */
   private lateUpdate() {
     const p = this.player;
+    p.keepOutOfWalls(this.map);
     p.syncAttachments();
     for (const enemy of this.livingEnemies()) enemy.syncEyes();
     this.drawHealthBars();
 
     // Свет собираем со всех и рисуем тьму одним проходом.
-    const flicker = 1 + Math.sin(this.time.now * 0.011) * 0.015 + Math.sin(this.time.now * 0.0043) * 0.02;
-    this.darkness.addLight(p.x, p.y, p.stats.light * flicker, 1);
+    // Когда масла мало, фонарь мерцает сильнее.
+    const shaky = 1 + (1 - Math.min(1, p.fuelRatio / RULES.fuelFullLightAt)) * 2.5;
+    const flicker = 1 + (Math.sin(this.time.now * 0.011) * 0.015 + Math.sin(this.time.now * 0.0043) * 0.02) * shaky;
+    const light = p.lightRadius * flicker;
+    this.darkness.setLantern(p.x, p.y, light); // фонарь не светит сквозь стены
     for (const b of this.bullets.getChildren() as Bullet[]) this.darkness.addLight(b.x, b.y, 26, 0.45);
     this.objectives.addLights(this.darkness);
     this.darkness.render();
-
-    this.lanternGlow.setPosition(p.x, p.y).setScale((p.stats.light * 2) / 128);
   }
 
   /** Клавиатура + виртуальный джойстик → вектор длиной не больше 1. */
@@ -316,6 +324,7 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
       this.gems.drop(enemy.x, enemy.y, enemy.def.xp);
       // Чуть в сторону, чтобы зелье не лежало прямо под кристаллом.
       if (Math.random() < enemy.def.potionChance) this.potions.drop(enemy.x + 8, enemy.y + 4, rollPotion());
+      if (Math.random() < RULES.oilDropChance) this.potions.drop(enemy.x - 8, enemy.y + 4, 'oil');
       enemy.destroy();
     }
   }
@@ -403,7 +412,18 @@ export class GameScene extends Phaser.Scene implements WeaponHost {
     if (this.objectives.isAtExit(p.x, p.y)) this.levelComplete();
   }
 
-  /* ───────────────────────── зелья ───────────────────────── */
+  /* ───────────────────────── зелья и масло ───────────────────────── */
+
+  /** Предупреждаем один раз, когда масла становится мало; долили — можно предупредить снова. */
+  private checkFuel() {
+    const ratio = this.player.fuelRatio;
+    if (!this.warnedLowFuel && ratio <= RULES.lowFuelWarning) {
+      this.warnedLowFuel = true;
+      this.toast(ratio <= 0 ? 'Масло кончилось' : 'Масло на исходе');
+    } else if (ratio > RULES.lowFuelWarning + 0.1) {
+      this.warnedLowFuel = false;
+    }
+  }
 
   private drinkPotion(kind: PotionKind) {
     const def = POTIONS[kind];

@@ -42,6 +42,8 @@ export class LevelMap {
   readonly start: Point;
   readonly exit: Point;
   readonly shardSpots: Point[] = [];
+  /** Банки масла, которые лежат на карте с самого начала (символ O). */
+  readonly oilSpots: Point[] = [];
   /** Индексы всех клеток пола (index = y * width + x). */
   readonly floorCells: number[] = [];
   private readonly walls: Uint8Array;
@@ -67,6 +69,7 @@ export class LevelMap {
         if (ch === 'P') start = center;
         if (ch === 'E') exit = center;
         if (ch === 'K') this.shardSpots.push(center);
+        if (ch === 'O') this.oilSpots.push(center);
       }
     });
 

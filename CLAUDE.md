@@ -13,7 +13,9 @@ npm run typecheck  # tsc --noEmit — strict, noUnusedLocals/Parameters are on
 npm run build      # typecheck + vite build into dist/
 ```
 
-There are no tests. "Done" = `npm run typecheck` passes + `npx vite build` succeeds + (for visual changes) a look in the browser.
+There are no tests. "Done" = `npm run typecheck` passes + `npx vite build` succeeds + (for visual changes) a screenshot:
+`node tools/screenshot.mjs http://localhost:<port>/ <scratch>/shot [js] [character] [level]` — headless Chrome via CDP,
+starts a level, optional JS runs in the page (e.g. move the hero), prints browser console errors. Read the PNGs it writes.
 The project is **not a git repository** — there is no history to diff against or revert to; be careful with overwrites.
 
 ## Conventions (follow them)
@@ -31,6 +33,16 @@ The project is **not a git repository** — there is no history to diff against 
 - Use `dt` in seconds (already clamped to 1/30 in `GameScene.update`); frame-rate-independent decay is `Math.pow(k, dt * 60)`.
 - `RunState` (`core/RunState.ts`: chosen `character`, level, stats, hp, xp) is carried between levels; `Stats` (`data/upgrades.ts`) is the persistent part of it copied between levels. **Temporary effects must not mutate stats** —
   derive them (see `Player.moveSpeed` / `Player.fireDelay` + `Player.buffs` for potions).
+- **Lantern fuel**: `Player.fuel` burns at `stats.fuelBurn`/s, resets each level; `Player.lightRadius` (not `stats.light`) is the
+  actual light — used for darkness, lantern glow and spawn distance. Oil is the `oil` item in `POTIONS` (weight 0, own drop chance
+  `RULES.oilDropChance`, map char `O`). Fuel tuning lives in `RULES`.
+- **Light vs walls**: only the hero's lantern is occluded. `Darkness.setLantern()` → `renderLantern()` draws the light into a
+  DynamicTexture (`lantern-light`), erases shadow wedges from `world/shadows.ts` (cast from wall faces turned *away* from the
+  light, so walls stay lit), then erases that texture out of the darkness RT; the orange glow is the same texture, tinted, ADD.
+  Small lights (`addLight`: bullets, gems, shards, fire) are not occluded.
+- **Targeting**: weapons only aim at enemies the hero can see — `isLit()` in `weapons/Weapon.ts` (inside 85% of
+  `lightRadius` + line of sight from the hero). `findNearestVisible` applies it; custom pickers (FireFlask) call it directly.
+  So effective weapon range is capped by the lantern: brighter lantern / more fuel = longer reach.
 
 ## Graphics pipeline
 
@@ -40,7 +52,7 @@ The project is **not a git repository** — there is no history to diff against 
 - Everything else is drawn in code in `src/art/textures.ts`. `makeTexture` **skips keys that already exist**, so loading a PNG under
   the same key (e.g. `enemy-ghoul`) replaces the code-drawn version automatically. Remove the dead canvas code when you do.
 - Current file assets: `hero.png` + `heroine.png` (32px, idle/walk/hurt — shared `CHARACTER_ANIMS`; sheet key = `CharacterId`), `rat.png` (24px, run/bite, texture key `enemy-rat`),
-  `wraith.png` (28px, run/cast/bite, key `enemy-wraith`), `tiles.png` (7×32px strip, order = `TILE_INDEX` in `world/LevelMap.ts`), `potions.png` (3×16px, frame = `POTIONS[k].frame`).
+  `wraith.png` (28px, run/cast/bite, key `enemy-wraith`), `tiles.png` (7×32px strip, order = `TILE_INDEX` in `world/LevelMap.ts`), `potions.png` (4×16px: heal, frenzy, speed, oil can; frame = `POTIONS[k].frame`).
 - Characters are drawn **facing right**; code mirrors with `flipX` (with a 0.2 threshold to avoid jitter).
 - Physics circle offset is computed from the frame: `this.width / 2 - radius` — don't hard-code it.
 - Sheet-based enemies use a single glowing `eye` overlay at `SHEETS[key].eye` (offset from center, facing right). The head must stay
@@ -54,6 +66,10 @@ The project is **not a git repository** — there is no history to diff against 
 
 - `RenderTexture` needs `rt.render()` after draw commands (`systems/Darkness.ts`).
 - `setTintFill()` is gone → `setTint(c).setTintMode(Phaser.TintModes.FILL)`.
+- Arcade physics, **circle vs circle ignores `pushable`** (`World.separateCircle` still moves a non-immovable body by half the
+  overlap). The hero is `immovable` so crowds can't shove it; tiles still block immovable bodies. Colliders run in creation
+  order — keep the wall colliders **last** in `GameScene.setupCollisions`. `Player.keepOutOfWalls()` is the safety net
+  (a lantern centred inside a wall cell shadows everything → black screen).
 - WebGL only; Canvas renderer is deprecated. `tilemap.createLayer` may return a GPU layer type — cast as in `GameScene.createTilemap`.
 - Official topic guides ship with the package: `node_modules/phaser/skills/<topic>/` (animations, tilemaps, physics-arcade,
   loading-assets, v3-to-v4-migration, …). Read the relevant one before using an unfamiliar API.
@@ -61,7 +77,7 @@ The project is **not a git repository** — there is no history to diff against 
 ## Debugging
 
 In the browser console: `game.scene.getScene('Game')` is the live scene, e.g. `.player.stats.blades = 5`,
-`.player.drink('frenzy')`, `.player.confuse(3)`, `.spawner.spawnOne(3, 10, 'wraith')` (force-spawn a kind). `debug: true` in `src/main.ts` shows physics bodies.
+`.player.drink('frenzy')`, `.player.confuse(3)`, `.player.fuel = 5`, `.spawner.spawnOne(3, 10, 'wraith')` (force-spawn a kind). `debug: true` in `src/main.ts` shows physics bodies.
 
 ## Project-local helpers
 

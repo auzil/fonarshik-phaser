@@ -3,6 +3,8 @@
 Мобильный top-down шутер-бродилка на **Phaser 4 + TypeScript + Vite**.
 Герой бродит по тёмным катакомбам с фонарём и сам стреляет в ближайшего монстра.
 На каждом уровне надо собрать 3 осколка света, тогда откроется выход.
+Герой стреляет только по тем, кого освещает фонарь; свет не проходит сквозь стены.
+Масло в фонаре понемногу сгорает: без него свет сжимается, а враги подходят ближе. Банки масла падают из врагов и лежат на картах.
 
 ## Запуск
 
@@ -18,6 +20,7 @@ npm run preview    # посмотреть собранную версию
 Отладка из консоли браузера: `game.scene.getScene('Game')` вернёт текущую сцену со всеми полями.
 Например, `game.scene.getScene('Game').player.stats.blades = 5` даст серпы 5 уровня
 (создадутся при следующем выборе усиления), а `game.scene.getScene('Game').player.drink('frenzy')` — выпить зелье.
+Масло: `game.scene.getScene('Game').player.fuel = 5`.
 Позвать конкретного врага: `game.scene.getScene('Game').spawner.spawnOne(3, 10, 'wraith')`. Физику можно увидеть, поставив `debug: true` в `src/main.ts`.
 
 ## Как читать код
@@ -45,10 +48,10 @@ src/
     joystick.ts           общее состояние джойстика между сценами
     RunState.ts           что переносится между уровнями + сохранение прогресса
   data/
-    levels.ts             карты уровней символами (# . P K E)
+    levels.ts             карты уровней символами (# . P K E O)
     enemies.ts            типы врагов
     upgrades.ts           характеристики героя, оружие, карточки усилений
-    potions.ts            зелья: лечение, ярость, скорость
+    potions.ts            зелья: лечение, ярость, скорость; банка масла для фонаря
     characters.ts         персонажи на выбор (Фонарщик, Фонарщица)
   art/
     textures.ts           графика, нарисованная кодом через Canvas
@@ -56,19 +59,20 @@ src/
   world/
     LevelMap.ts           разбор карты, стены, данные для тайлмапа
     lineOfSight.ts        линия видимости (DDA) с толщиной луча
+    shadows.ts            тени от стен: клинья за дальними гранями стен
     FlowField.ts          поле потока: как враги находят героя в лабиринте
   entities/
     Player.ts  Enemy.ts  Bullet.ts
   systems/
     EnemySpawner.ts       когда и где появляются враги (с лимитом maxAlive для редких)
     EnemyShots.ts         снаряды врагов: сгустки Морока путают управление
-    Darkness.ts           слой тьмы с «вырезанным» светом (RenderTexture + ERASE)
+    Darkness.ts           слой тьмы с «вырезанным» светом (RenderTexture + ERASE), фонарь не светит сквозь стены
     Effects.ts            частицы, тряска камеры, вибрация
     XpGems.ts             кристаллы опыта и магнит
     Potions.ts            зелья на полу: подбор, мигание, исчезновение
     Objectives.ts         осколки и выход, твины
   weapons/
-    Weapon.ts             интерфейс оружия, WeaponHost, поиск цели
+    Weapon.ts             интерфейс оружия, WeaponHost, поиск цели (только освещённые враги: isLit)
     Pistol.ts  Blades.ts  Lightning.ts  FireFlask.ts  Nova.ts
     index.ts              фабрика: id оружия → объект
   scenes/
@@ -84,6 +88,8 @@ src/
 `node tools/art/hero.mjs` пересоздаст `public/assets/hero.png` — **осторожно, перезапишет твою перерисованную версию**.
 Скрипты — хороший образец, если хочешь нарисовать что-то кодом попиксельно.
 
+`node tools/screenshot.mjs http://localhost:5173/ /tmp/shot` — скриншот уровня из headless Chrome (нужен запущенный `npm run dev`).
+
 ## Главные идеи Phaser, которые здесь есть
 
 | Что | Где посмотреть |
@@ -96,6 +102,7 @@ src/
 | Текстуры из Canvas | `art/textures.ts` |
 | Спрайтшит и анимации (`load.spritesheet`, `anims.create`, `play`) | `art/sheets.ts`, `Player.move()`, `Enemy.walkTowards()` |
 | RenderTexture и режимы смешивания (свет во тьме) | `systems/Darkness.ts` |
+| DynamicTexture и Graphics как «кисть»: свет фонаря с тенями от стен | `Darkness.renderLantern()`, `world/shadows.ts` |
 | Твины (анимация свойств) и цепочки твинов | `Objectives.ts`, `FireFlask.throwAt()`, `HudScene.showToast()` |
 | Частицы | `systems/Effects.ts` |
 | Graphics: рисование линий и фигур каждый кадр | `Lightning.ts`, `Nova.ts`, полоски HP |
@@ -122,6 +129,10 @@ src/
 **Персонажа.** Нарисуй лист с той же раскладкой, что `hero.png`, положи в `public/assets/`,
 добавь строчку в `SHEETS` (`src/art/sheets.ts`, с `anims: CHARACTER_ANIMS`) и в `CHARACTERS` (`src/data/characters.ts`) —
 ключ листа и id персонажа совпадают. Карточка в меню появится сама. Выбор хранится в `localStorage` и в `RunState.character`.
+
+**Баланс масла.** Бак, порог тусклого света, шанс выпадения банки — в `RULES` (`src/config.ts`),
+расход — `fuelBurn` в `BASE_STATS`, сколько доливает банка — `POTIONS.oil.fuel`. Банки на карте — символ `O` в `levels.ts`.
+Радиус света с учётом масла считает `Player.lightRadius` — используй его, а не `stats.light`.
 
 **Стреляющего врага.** Дай врагу поле `ranged` (дальность, пауза, замах, скорость и урон снаряда, `confuse`) —
 как у Морока в `src/data/enemies.ts`. Остановку на дистанции и выстрел делает `GameScene.steerShooter()`,

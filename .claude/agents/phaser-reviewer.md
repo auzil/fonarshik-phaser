@@ -12,7 +12,8 @@ Check, in priority order:
 1. **Correctness**: logic errors, wrong units (dt is seconds; speeds are px/s), off-by-one in frame numbers
    (`row * columns + col`), wrong texture/animation keys (`animKey(sheet, name)`), null/undefined paths.
 2. **Phaser 4 pitfalls**: `RenderTexture` without `.render()`; `setTintFill` (removed → `setTint().setTintMode(FILL)`);
-   Phaser 3-only APIs. When unsure about an API, grep `node_modules/phaser/types/phaser.d.ts` or read
+   Phaser 3-only APIs; relying on `pushable = false` for circle bodies (ignored in circle-vs-circle separation);
+   new colliders added after the wall colliders in `setupCollisions` (walls must stay last). When unsure about an API, grep `node_modules/phaser/types/phaser.d.ts` or read
    `node_modules/phaser/skills/<topic>/SKILL.md` — do not guess.
 3. **Lifecycle leaks**: listeners added in `create()` without `off` on `SHUTDOWN`; per-run fields not reset in `init()`
    (scene objects are reused across restarts); attached images (gun, lantern, eyes) not destroyed in `destroy()`;
@@ -24,7 +25,8 @@ Check, in priority order:
    `run`, `bite`, `eye`; new PNGs registered in `src/art/sheets.ts` and present in `public/assets/`.
 7. **Docs & style**: Russian explanatory comments matching neighbours; README file tree / "Как добавить…" updated;
    CLAUDE.md asset list updated.
-8. Run `npm run typecheck` and report its result.
+8. Run `npm run typecheck` and report its result. For rendering changes, if a dev server is running, take a screenshot with
+   `node tools/screenshot.mjs` (see the `verify-game` skill) and look at it.
 
 Output: a list of findings, most severe first. Each: `file:line`, what is wrong, a concrete failing scenario, and the fix.
 Separate real bugs from style nits. If nothing is wrong, say so plainly — do not invent issues.

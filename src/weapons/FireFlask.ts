@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import type { Enemy } from '../entities/Enemy';
 import { hasLineOfSight } from '../world/lineOfSight';
-import type { Weapon, WeaponHost } from './Weapon';
+import { isLit, type Weapon, type WeaponHost } from './Weapon';
 
 const statsFor = (level: number) => ({
   cooldown: 3.0 - 0.3 * level,
@@ -49,7 +49,7 @@ export class FireFlask implements Weapon {
     this.burnEnemies(dt);
   }
 
-  /** Видимый враг в радиусе броска с максимумом соседей. */
+  /** Видимый (освещённый фонарём) враг в радиусе броска с максимумом соседей. */
   private pickTarget(range: number, poolRadius: number): Enemy | null {
     const { player, map } = this.host;
     const enemies = this.host.livingEnemies();
@@ -58,6 +58,7 @@ export class FireFlask implements Weapon {
 
     for (const e of enemies) {
       if (Phaser.Math.Distance.Between(player.x, player.y, e.x, e.y) > range) continue;
+      if (!isLit(this.host, e)) continue; // в темноту не бросаем
       if (!hasLineOfSight(map, player.x, player.y, e.x, e.y, 3)) continue;
       const crowd = enemies.filter(o => Phaser.Math.Distance.Between(o.x, o.y, e.x, e.y) < poolRadius).length;
       if (crowd > bestCrowd) {

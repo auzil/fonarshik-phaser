@@ -12,6 +12,7 @@ export interface Stats {
   regen: number; // здоровья в секунду
   light: number; // радиус фонаря, px
   magnet: number; // с какого расстояния тянутся кристаллы, px
+  fuelBurn: number; // расход масла в фонаре, единиц в секунду (бак — RULES.maxFuel)
   // пистолет (есть всегда)
   fireDelay: number; // пауза между выстрелами, сек
   damage: number;
@@ -32,6 +33,7 @@ export const BASE_STATS: Stats = {
   regen: 0,
   light: 170,
   magnet: 64,
+  fuelBurn: 1.4, // полного бака хватает примерно на 70 секунд
   fireDelay: 0.45,
   damage: 10,
   bullets: 1,
@@ -80,6 +82,7 @@ const UPGRADES: Upgrade[] = [
   { kind: 'pistol', glyph: '⟶', name: 'Длинный ствол', desc: 'Дальность и скорость пуль +20%', available: s => s.range < 450, apply: s => { s.range *= 1.2; s.bulletSpeed *= 1.2; } },
   { kind: 'hero', glyph: '≫', name: 'Лёгкие сапоги', desc: 'Скорость ходьбы +12%', available: s => s.speed < 220, apply: s => { s.speed *= 1.12; } },
   { kind: 'hero', glyph: '☼', name: 'Ярче фонарь', desc: 'Свет дальше, кристаллы тянутся издалека', available: s => s.light < 300, apply: s => { s.light += 32; s.magnet += 24; } },
+  { kind: 'hero', glyph: '◍', name: 'Экономный фитиль', desc: 'Масло в фонаре расходуется на 20% медленнее', available: s => s.fuelBurn > 0.6, apply: s => { s.fuelBurn *= 0.8; } },
   { kind: 'hero', glyph: '♥', name: 'Живучесть', desc: '+25 к здоровью и сразу лечит на 25', apply: s => { s.maxHp += 25; }, heal: 25 },
   { kind: 'hero', glyph: '❧', name: 'Травы', desc: '+1,5 здоровья в секунду', available: s => s.regen < 6, apply: s => { s.regen += 1.5; } },
 ];

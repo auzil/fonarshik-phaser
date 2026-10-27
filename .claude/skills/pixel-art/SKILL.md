@@ -15,7 +15,7 @@ There is no image library installed (no PIL, no node-canvas). Art is drawn pixel
 | `tools/art/rat.mjs` | `rat.png` 4×2 frames of 24 | head fixed for the eye overlay |
 | `tools/art/wraith.mjs` | `wraith.png` 4×2 frames of 28 | floating robe, hem waves, cast orb; head fixed |
 | `tools/art/tiles.mjs` | `tiles.png` 7 tiles of 32 | seeded RNG, seamless floor, brick walls |
-| `tools/art/potions.mjs` | `potions.png` 3 frames of 16 | round flask, liquid colour per frame |
+| `tools/art/potions.mjs` | `potions.png` 4 frames of 16 | `item()` helper + outline; round flasks, tin oil can |
 
 `node tools/art/<name>.mjs [outPath]` — without `outPath` it **overwrites `public/assets/<name>.png`**.
 

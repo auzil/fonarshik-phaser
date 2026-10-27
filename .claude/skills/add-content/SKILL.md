@@ -31,7 +31,8 @@ Characters are cosmetic today; per-character stats would go as an optional `stat
 1. `src/data/upgrades.ts`: level field in `Stats` + `BASE_STATS` (0 = not owned), `WeaponId`, `WEAPON_INFO` (glyph, name, descs).
 2. `src/weapons/<Name>.ts`: class implementing `Weapon` with `update(dt)` (copy `Nova.ts`). Use only `WeaponHost`
    (`host.player`, `host.livingEnemies()`, `host.fx`, `host.darkness`, `host.add/tweens/time`), never import GameScene.
-   Helpers: `findNearestVisible`, `direction` in `Weapon.ts`. Scale with `player.stats.<id>` level. Clean up in `destroy()`.
+   Helpers: `findNearestVisible` (already skips enemies in the dark), `isLit` (use it in any custom target picker —
+   the hero never aims at enemies outside the lantern light), `direction` in `Weapon.ts`. Scale with `player.stats.<id>` level. Clean up in `destroy()`.
 3. `src/weapons/index.ts`: one line in `WEAPON_FACTORY`.
 The level-up cards and HUD pick it up automatically.
 
@@ -40,14 +41,17 @@ The level-up cards and HUD pick it up automatically.
 2. A new multiplier field (e.g. `damage`) also needs: the field in `PotionDef`, the union in `Player.buffMultiplier`, and a getter
    on `Player` that the consuming code reads instead of `stats.x`. Never mutate `stats` for timed effects.
 3. Draw a new 16×16 frame at the end of `public/assets/potions.png` (`pixel-art` skill, `tools/art/potions.mjs`).
-Drop rates: `potionChance` per enemy in `data/enemies.ts`.
+Drop rates: `potionChance` per enemy in `data/enemies.ts`; random drops are weighted, a `weight: 0` item (like `oil`)
+never rolls and needs its own drop rule (oil: `RULES.oilDropChance` in `GameScene.removeDeadEnemies`).
+Map-placed items: `potions.drop(x, y, kind, Infinity)` — they never expire.
 
 ## Upgrade card (permanent stat boost)
 Add an entry to `UPGRADES` in `src/data/upgrades.ts`: `kind` ('pistol' | 'hero'), glyph, name, desc,
 optional `available(s)` cap, `apply(s)`, optional `heal`.
 
 ## Level
-Append to `LEVELS` in `src/data/levels.ts`. Map chars: `#` wall, `.` floor, `P` start (one), `K` shard (≥1), `E` exit (one).
+Append to `LEVELS` in `src/data/levels.ts`. Map chars: `#` wall, `.` floor, `P` start (one), `K` shard (≥1), `E` exit (one),
+`O` lantern oil can (2–3 per level in corners / dead ends; more and fuel stops mattering).
 Rows may differ in length (missing = wall). Tune `spawnEvery`, `maxEnemies`, `shardAmbush`, `enemyMix`.
 The last level is detected by index, so nothing else to change.
 
